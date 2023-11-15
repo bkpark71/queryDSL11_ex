@@ -6,6 +6,8 @@ import com.example.querydsl11_ex.entity.QDepartment;
 import com.example.querydsl11_ex.entity.QEmployee;
 import com.querydsl.core.QueryResults;
 import com.querydsl.core.Tuple;
+import com.querydsl.core.types.dsl.Expressions;
+import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,6 +22,8 @@ import javax.persistence.PersistenceContext;
 import java.util.List;
 
 import static com.example.querydsl11_ex.entity.QEmployee.*;
+import static com.example.querydsl11_ex.entity.QDepartment.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @Transactional
@@ -46,7 +50,7 @@ public class QueryDslTest {
                 .setParameter("empName", "emp1")
                 .getSingleResult();
         //then
-        Assertions.assertThat(findEmp.getDepartment().getDeptName()).isEqualTo("dept1");
+        assertThat(findEmp.getDepartment().getDeptName()).isEqualTo("dept1");
         System.out.println(findEmp);
         System.out.println(findEmp.getDepartment());
     }
@@ -60,7 +64,7 @@ public class QueryDslTest {
                 .from(employee)
                 .where(employee.empName.eq("emp1"))
                 .fetchOne();
-        Assertions.assertThat(findEmp.getDepartment().getDeptName()).isEqualTo("dept1");
+        assertThat(findEmp.getDepartment().getDeptName()).isEqualTo("dept1");
         System.out.println(findEmp);
         System.out.println(findEmp.getDepartment());
     }
@@ -77,7 +81,7 @@ public class QueryDslTest {
                 )
                 .fetch();
         //then
-        Assertions.assertThat(findEmp.size()).isEqualTo(3);
+        assertThat(findEmp.size()).isEqualTo(3);
     }
 
     @Test
@@ -90,7 +94,7 @@ public class QueryDslTest {
                 )
                 .fetchCount();
         //then
-        Assertions.assertThat(empCnt).isEqualTo(2);
+        assertThat(empCnt).isEqualTo(2);
     }
 
 
@@ -102,8 +106,8 @@ public class QueryDslTest {
                 .fetchResults();
         //then
 
-        Assertions.assertThat(qryResults.getTotal()).isEqualTo(5);
-        Assertions.assertThat(qryResults.getResults().size()).isEqualTo(5);
+        assertThat(qryResults.getTotal()).isEqualTo(5);
+        assertThat(qryResults.getResults().size()).isEqualTo(5);
         for (Employee e : qryResults.getResults()) {
             System.out.println(e);
         }
@@ -157,19 +161,102 @@ public class QueryDslTest {
                 .select(employee.department.deptId, employee.salary.avg())
                 .from(employee)
                 .groupBy(employee.department.deptId)
+                .having(employee.salary.avg().goe(200))
                 .fetch();
 
-        Tuple tuple1 = tuples.get(0);
-        Tuple tuple2 = tuples.get(1);
+//        Tuple tuple1 = tuples.get(0);
+//        Tuple tuple2 = tuples.get(1);
 
-        Double dept1_avg = tuple1.get(employee.salary.avg());
-        Double dept2_avg = tuple2.get(employee.salary.avg());
+//        Double dept1_avg = tuple1.get(employee.salary.avg());
+//        Double dept2_avg = tuple2.get(employee.salary.avg());
 
-        System.out.println("tuple1 ==> " + tuple1);
-        System.out.println("tuple2 ==> " + tuple2);
-
-
+        System.out.println("tuple1 ==> " + tuples.size());
+        assertThat(tuples.get(0).get(employee.department.deptId)).isEqualTo(2);
     }
+
+    @Test
+    public void joinTest(){
+        QEmployee e = employee; // ���� ���� ����
+        QDepartment d = department; // ���� ���� ����
+
+//        List<Employee> emps = qryFactory
+//                .select(e)
+//                .from(e)
+//                .join(e.department,d)
+//                .where(e.department.deptId.eq(1))
+//                .fetch();
+//
+//        assertThat(emps.size()).isEqualTo(2);
+//        for (Employee emp : emps) {
+//            System.out.println(emp);
+//        }
+
+                List<Employee> emps = qryFactory
+                .select(e)
+                .from(e)
+                .leftJoin(e.department,d)
+                .where(e.department.deptName.startsWith("dept"))
+                .fetch();
+
+                assertThat(emps.size()).isEqualTo(6);
+    }
+
+    @Test
+    public void thetajoinTest(){
+        QEmployee e = employee; // ���� ���� ����
+        QDepartment d = department; // ���� ���� ����\
+
+        List<Employee> fetch = qryFactory
+                .select(e)
+                .from(e, d)
+                .where(e.department.deptId.eq(e.empId))
+                .fetch();
+
+        assertThat(fetch.size()).isEqualTo(3);
+    }
+
+    @Test
+    public void subqueryTest(){
+        QEmployee emp = new QEmployee("emp");
+        QEmployee sub_emp = new QEmployee("sub_emp");
+
+//        List<Employee> emps = qryFactory
+//                .selectFrom(emp)
+//                .where(emp.salary.goe(
+//                        JPAExpressions
+//                                .select(sub_emp.salary.avg())
+//                                .from(sub_emp))
+//                )
+//                .fetch();
+
+//        List<Employee> emps = qryFactory
+//                .selectFrom(emp)
+//                .where(emp.salary.in(
+//                        JPAExpressions
+//                                .select(sub_emp.salary)
+//                                .from(sub_emp)
+//                                .where(sub_emp.salary.loe(200)))
+//                )
+//                .fetch();
+//
+//        assertThat(emps.size()).isEqualTo(5);
+       // assertThat(emps).extracting("salary").containsExactly(300,300,300);
+
+        List<Tuple> tuples = qryFactory
+                .select(emp.empName,
+                        JPAExpressions
+                                .select(sub_emp.salary.avg())
+                                .from(sub_emp)
+                )
+                .from(emp)
+                .fetch();
+
+        for (Tuple tuple : tuples) {
+            System.out.println(tuple.get(emp.empName) + ":" +
+                        tuple.get(JPAExpressions.select(sub_emp.salary.avg()).from(sub_emp)));
+        };
+    }
+
     private void createTestData() {
         Department dept1 = new Department();
         dept1.setDeptName("dept1");

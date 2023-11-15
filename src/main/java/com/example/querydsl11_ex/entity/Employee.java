@@ -10,7 +10,7 @@ import javax.persistence.*;
 @Entity
 @Getter
 @Setter
-@ToString(of={"empId", "empName"})
+@ToString(of={"empId", "empName", "salary"})
 @Table(name = "employees")
 public class Employee {
     @Id
@@ -22,4 +22,6 @@ public class Employee {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "dept_id")
     private Department department;
+
+    private int salary;
 }

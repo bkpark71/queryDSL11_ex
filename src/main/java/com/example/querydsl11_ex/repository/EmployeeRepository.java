@@ -6,7 +6,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
 
-public interface EmployeeRepository extends JpaRepository<Employee, Integer> {
+public interface EmployeeRepository extends JpaRepository<Employee, Integer> ,
+                                            EmployeeRepositoryQuery   {
     public List<Employee> findByEmpName(String empName);
     public List<Employee> findBySalaryGreaterThanEqual(Integer salary);
 

@@ -8,6 +8,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
 
 import java.util.List;
 
@@ -18,11 +19,11 @@ import static org.junit.jupiter.api.Assertions.*;
 @Transactional
 class EmployeeRepositoryTest {
 
-    @Autowired
+    @PersistenceContext  //수정
     EntityManager em;
 
     @Autowired
-    EmployeeRepository employeeRepository;
+    EmployeeRepository employeeRepository;//수정 - 오류가 있어서 entitymanager autowired ==> persistContext 로 수정함
 
     @Test
     public void findAll() {

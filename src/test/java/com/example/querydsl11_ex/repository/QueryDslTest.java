@@ -1,11 +1,17 @@
 package com.example.querydsl11_ex.repository;
 
+import com.example.querydsl11_ex.dto.DynamicSearchCond;
+import com.example.querydsl11_ex.dto.EmployeeDto;
+import com.example.querydsl11_ex.dto.QEmployeeDto;
 import com.example.querydsl11_ex.entity.Department;
 import com.example.querydsl11_ex.entity.Employee;
 import com.example.querydsl11_ex.entity.QDepartment;
 import com.example.querydsl11_ex.entity.QEmployee;
+import com.querydsl.core.BooleanBuilder;
 import com.querydsl.core.QueryResults;
 import com.querydsl.core.Tuple;
+import com.querydsl.core.types.Projections;
+import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
@@ -15,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.annotation.Rollback;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import javax.persistence.EntityManager;
 import javax.persistence.EntityManagerFactory;
@@ -49,10 +56,49 @@ public class QueryDslTest {
         Employee findEmp = em.createQuery("select e from Employee e where e.empName = :empName", Employee.class)
                 .setParameter("empName", "emp1")
                 .getSingleResult();
+
         //then
         assertThat(findEmp.getDepartment().getDeptName()).isEqualTo("dept1");
         System.out.println(findEmp);
         System.out.println(findEmp.getDepartment());
+    }
+
+    @Test
+    public void jpqlDtoTest(){
+        //given
+        //when
+        List<EmployeeDto> findEmps = em.createQuery("select " +
+                        "new com.example.querydsl11_ex.dto.EmployeeDto(e.empName, e.salary) " +
+                        "from Employee e " +
+                        "where e.empName = :empName", EmployeeDto.class)
+                .setParameter("empName", "emp1")
+                .getResultList();
+        //then
+        assertThat(findEmps.size()).isGreaterThan(1);
+        for (EmployeeDto findEmp : findEmps) {
+            System.out.println(findEmp);
+        }
+    }
+
+    @Test
+    public void queryDSLDtoTest(){
+//        EmployeeDto emp1 = qryFactory.select(Projections
+//                        .fields(EmployeeDto.class,
+//                                employee.empName.as("name"),
+//                                employee.salary))
+//                .from(employee)
+//                .where(employee.empName.eq("emp1"))
+//                .fetchOne();
+
+        EmployeeDto emp1 = qryFactory.select(Projections
+                        .constructor(EmployeeDto.class,
+                                employee.empName,
+                                employee.salary))
+                .from(employee)
+                .where(employee.empName.eq("emp1"))
+                .fetchOne();
+
+        System.out.println(emp1);
     }
 
     @Test
@@ -285,4 +331,69 @@ public class QueryDslTest {
         em.persist(emp3);
     }
 
+    @Test
+    public void dynamicQueryBooleanBuilder(){
+        DynamicSearchCond searchCond = new DynamicSearchCond();
+        //searchCond.setEmpName("emp1");
+        searchCond.setSalary(300);
+        List<EmployeeDto> employees = getEmployeesByBooleanBuilder(searchCond);
+        assertThat(employees.size()).isEqualTo(3);
+    }
+
+    public List<EmployeeDto> getEmployeesByBooleanBuilder(DynamicSearchCond searchCond){
+        BooleanBuilder builder = new BooleanBuilder();
+        if(StringUtils.hasText(searchCond.getEmpName())){
+            builder.and(employee.empName.eq(searchCond.getEmpName()));
+        }
+        if(searchCond.getSalary() != null){
+            builder.and(employee.salary.goe(searchCond.getSalary()));
+        }
+        if(StringUtils.hasText(searchCond.getDeptName())){
+            builder.and(department.deptName.eq(searchCond.getDeptName()));
+        }
+        List<EmployeeDto> fetch = qryFactory
+                .select(Projections.constructor(
+                        EmployeeDto.class,
+                        employee.empName,
+                        employee.salary))
+                .from(employee)
+                .where(builder)
+                .fetch();
+        return fetch;
+    }
+
+    @Test
+    public void dynamicQueryWhereTest(){
+        DynamicSearchCond searchCond = new DynamicSearchCond();
+        //searchCond.setEmpName("emp1");
+        searchCond.setDeptName("dept2");
+        List<EmployeeDto> employees = getEmployeesByWhereParam(searchCond);
+        assertThat(employees.size()).isEqualTo(4);
+    }
+
+    public List<EmployeeDto> getEmployeesByWhereParam(DynamicSearchCond searchCond) {
+        List<EmployeeDto> fetch = qryFactory
+                .select(new QEmployeeDto(
+                        employee.empName,
+                        employee.salary))
+                .from(employee)
+                .where(
+                        empNameEq(searchCond.getEmpName()),
+                        salaryGoe(searchCond.getSalary()),
+                        deptNameEq(searchCond.getDeptName())
+                )
+                .fetch();
+        return fetch;
+    }
+    private BooleanExpression empNameEq(String empName) {
+        return StringUtils.hasText(empName) ? employee.empName.eq(empName) : null;
+    }
+
+    private BooleanExpression salaryGoe(Integer salary) {
+        return salary != null ? employee.salary.goe(salary) : null;
+    }
+
+    private BooleanExpression deptNameEq(String deptName) {
+        return StringUtils.hasText(deptName) ? department.deptName.eq(deptName) : null;
+    }
 }

@@ -13,7 +13,7 @@ import java.util.List;
 @Transactional
 @RequiredArgsConstructor
 public class EmployeeService {
-    private final EmployeeRepositoryQuery employeeRepository;
+    private final EmployeeRepository employeeRepository;
 
     public List<EmployeeDto> getEmployeesByDynamicCondition(
             DynamicSearchCond searchCond) {
